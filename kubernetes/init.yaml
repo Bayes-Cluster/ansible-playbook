@@ -1,5 +1,5 @@
 - name: intialization of kubernetes installation
-  host: all
+  hosts: all
 
   tasks:
   - name: turn off swap
