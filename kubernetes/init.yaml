@@ -1,5 +1,6 @@
 - name: intialization of kubernetes installation
   hosts: all
+  become: true
 
   tasks:
   - name: turn off swap
@@ -7,11 +8,11 @@
       cmd: sudo swapoff -a
 
   - name: before install containerd and docker
-    shell: |
-      modprobe overlay && modprobe br_netfilter
-      touch /etc/modules-load.d/containerd.conf
-      touch /etc/sysctl.d/99-kubernetes-cri.conf
-    become: true
+    shell:
+      cmd: |
+        modprobe overlay && modprobe br_netfilter
+        touch /etc/modules-load.d/containerd.conf
+        touch /etc/sysctl.d/99-kubernetes-cri.conf
 
   - name: kernel-module - containerd
     blockinfile:
@@ -19,7 +20,6 @@
       block: |
         overlay
         br_netfilter
-    become: true
 
   - name: kernel-module - kubernetes-cri
     blockinfile:
@@ -28,7 +28,6 @@
         net.bridge.bridge-nf-call-iptables  = 1
         net.ipv4.ip_forward                 = 1
         net.bridge.bridge-nf-call-ip6tables = 1
-    become: true
 
   - name: enable ip-forwarding
     blockinfile:
@@ -36,25 +35,57 @@
       block: |
         net.ipv4.ip_forward = 1
         net.ipv6.conf.all.forwarding = 1
-    become: true
 
-  - name: install containerd and docker
-    shell: |
-      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://mirrors.bfsu.edu.cn/docker-ce/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-      apt-get update && apt-get -y install ocker-ce docker-ce-cli containerd.io docker-compose-plugin
-    become: true
+  - name: Install apt-transport-https
+    apt:
+      name: ['apt-transport-https', 'ca-certificates', 'lsb-release', 'gnupg']
+      state: latest
 
-  - name: replace sandbox and SysstemdCgroup
-    shell: |
-      sed -i 's/            SystemdCgroup = true/            SystemdCgroup = false/' /etc/containerd/config.toml
-      sed -i 's/    sandbox_image = "k8s.gcr.io/pause:3.6"/    sandbox_image = "registry.cn-hangzhou.aliyuncs.com/pause:3.6"' /etc/containered/config.toml
-    become: true
+  - name: Add Docker GPG Key
+    shell:
+      cmd: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
-  - name: install kubeadm kubelet kubectl
-    shell: |
-      curl https://mirrors.aliyun.com/kubernetes/apt/doc/apt-key.gpg | sudo apt-key add -
-      echo 'deb https://mirrors.aliyun.com/kubernetes/apt/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list
-      apt-get update && apt-get install -y kubelet=1.25.4-00 kubeadm=1.25.4-00 kubectl=1.25.4-00
-      systemctl enable --now kubelet
-    become: true
+  - name: Add Docker repository list
+    shell:
+      cmd: |
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://mirrors.bfsu.edu.cn/docker-ce/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        apt update
+
+  - name: Install Docker and Containerd
+    apt:
+      name: ['docker-ce', 'docker-ce-cli', 'containerd.io']
+      state: latest
+
+  - name: Container Default config
+    shell:
+      cmd: |
+        sudo mkdir -p /etc/containerd
+        sudo containerd config default | sudo tee /etc/containerd/config.toml
+
+  - name: replace SystemdCgroup
+    replace:
+      path: /etc/containerd/config.toml
+      regexp: 'SystemdCgroup = false'
+      replace: 'SystemdCgroup = true'
+
+  - name: replace Sandbox Image
+    replace:
+      path: /etc/containerd/config.toml
+      regexp: 'sandbox_image = "registry.k8s.io/pause:3.6"'
+      replace: 'sandbox_image = "registry.cn-hangzhou.aliyuncs.com/pause:3.6"'
+
+  - name: Add Kubernetes GPG Key
+    apt_key:
+      url: "https://mirrors.aliyun.com/kubernetes/apt/doc/apt-key.gpg"
+      state: present
+
+  - name: Add Kubernetes Repository Key
+    apt_repository:
+      repo: "deb https://mirrors.aliyun.com/kubernetes/apt/ kubernetes-xenial main"
+      state: present
+      filename: kubernetes
+
+  - name: Install Kubernetes and Docker
+    apt:
+      name: ['kubelet', 'kubeadm', 'kubectl']
+      state: latest
