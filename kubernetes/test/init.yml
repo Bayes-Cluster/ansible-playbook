@@ -8,7 +8,7 @@
       cmd: sudo swapoff -a
 
   - name: before install containerd and docker
-    shell:
+    shell: 
       cmd: |
         modprobe overlay && modprobe br_netfilter
         touch /etc/modules-load.d/containerd.conf
@@ -57,7 +57,7 @@
       state: latest
 
   - name: Container Default config
-    shell:
+    shell: 
       cmd: |
         sudo mkdir -p /etc/containerd
         sudo containerd config default | sudo tee /etc/containerd/config.toml
@@ -71,7 +71,7 @@
   - name: replace Sandbox Image
     replace:
       path: /etc/containerd/config.toml
-      regexp: 'sandbox_image = "registry.k8s.io/pause:3.6"'
+      regexp: 'sandbox_image = "k8s.gcr.io/pause:3.6"'
       replace: 'sandbox_image = "registry.cn-hangzhou.aliyuncs.com/pause:3.6"'
 
   - name: Add Kubernetes GPG Key
@@ -85,7 +85,7 @@
       state: present
       filename: kubernetes
 
-  - name: Install Kubernetes and Docker
+  - name: Install Kubernetes and Docker 
     apt:
       name: ['kubelet', 'kubeadm', 'kubectl']
       state: latest

@@ -1,0 +1,7 @@
+- name: Step 01
+  hosts: all
+  become: true
+  
+  roles:
+  - basic
+  - container-engine

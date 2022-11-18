@@ -1,0 +1,32 @@
+- name: Container Default config
+  shell:
+    cmd: |
+      sudo mkdir -p /etc/containerd
+      sudo containerd config default | sudo tee /etc/containerd/config.toml
+
+- name: Restart containerd
+  service:
+    name: containerd
+    state: stopped
+    enabled: yes
+
+- name: Replace SystemdCgroup
+    replace:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    replace: 'SystemdCgroup = true'
+
+- name: replace Sandbox Image
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: 'sandbox_image = "registry.k8s.io/pause:3.6"'
+    replace: 'sandbox_image = "registry.cn-hangzhou.aliyuncs.com/pause:3.6"'
+  register: containerd_config_result
+ 
+- name: Start containerd
+  service: 
+    name: containerd
+    state: restarted
+    enabled: yes
+  when:
+  - containerd_config_result_changed

@@ -1,0 +1,54 @@
+- name: turn off swap
+  shell: "swapoff -a && sysctl -w vm.swappiness=0"
+
+- name: Load Kernal Modules
+  modprobe: 
+    name: '{{ item }}'
+    state: present
+  with_items:
+    - ip_vs
+    - ip_vs_rr
+    - ip_vs_wrr
+    - ip_vs_sh
+    - overlay
+    - nf_conntrack
+    - br_netfilter
+  ignore_errors: true
+
+- name: Touch Files for  containerd and Kubernetes-CRI Config
+  shell:
+    cmd: |
+      touch /etc/modules-load.d/containerd.conf
+      touch /etc/sysctl.d/99-kubernetes-cri.conf
+
+- name: Kernel Modules - Containerd
+  blockinfile:
+    path: "/etc/modules-load.d/containerd.conf"
+    block: |
+      overlay
+      br_netfilter
+
+- name: Kernel Modules - Kubernetes-CRI
+  blockinfile:
+    path: "/etc/sysctl.d/99-kubernetes-cri.conf"
+    block: |
+      net.bridge.bridge-nf-call-iptables  = 1
+      net.ipv4.ip_forward                 = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+
+- name: IPV4/V6 Network Forwarding
+  vars:
+    sysctl_net:
+      net.ipv4.ip_forward: 1
+      net.ipv6.conf.all.forwarding: 1
+  sysctl:
+    name: '{{ item.key }}'
+    value: '{{ item.value }}'
+    sysctl_set: yes
+    state: present
+    reload: yes
+  ignore_errors: yes
+  with_dict: '{{ sysctl_net }}'
+
+- name: Sysctl Restart
+  shell: sysctl -p --system

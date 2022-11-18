@@ -1,0 +1,11 @@
+[all]
+node01 ansible_host=192.168.10.2 ansible_port=22
+node02 ansible_host=192.168.10.3 ansible_port=22
+node02 ansible_host=192.168.10.4 ansible_port=22
+
+[k8s-control]
+node01
+node02
+
+[k8s-compute]
+node03
