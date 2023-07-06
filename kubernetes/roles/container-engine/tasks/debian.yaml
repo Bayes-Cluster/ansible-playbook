@@ -10,15 +10,37 @@
     dest: /etc/apt/keyrings/docker.gpg
     mode: '0644'
 
-- name: Add Docker GPG Key
-  shell: gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+- name: add Docker GPG key
+  shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 
 - name: Add Docker apt Repositry
   apt_repository:
-    repo: "https://mirrors.bfsu.edu.cn/docker-ce/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+    repo: "deb https://mirrors.bfsu.edu.cn/docker-ce/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
     state: present
-
+    filename: docker.list
+    
 - name: Install Docker and Containerd
   apt:
     name: ['docker-ce', 'docker-ce-cli', 'containerd.io']
     state: latest
+
+- name: Add Kubernetes related repository
+  apt_key:
+    url: "https://mirrors.aliyun.com/kubernetes/apt/doc/apt-key.gpg"
+    state: present
+  
+- name: Add Kubernetes repository
+  apt_repository:
+    repo: "deb https://mirrors.tuna.tsinghua.edu.cn/kubernetes/apt kubernetes-xenial main"
+    state: present
+
+- name: Install kubelet/kubeadm/kubectl
+  apt:
+    name: ['kubelet', 'kubeadm', 'kubectl']
+    state: latest
+
+- name: Enable and start kubelet
+  ansible.builtin.systemd:
+    name: kubelet
+    state: started
+    enabled: true
